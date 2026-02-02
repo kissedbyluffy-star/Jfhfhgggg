@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trustora
+      POSTGRES_PASSWORD: trustora
+      POSTGRES_DB: trustora
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    networks:
+      - backend
+
+  signer:
+    build: .
+    command: python -m services.signer.main
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./secrets:/app/secrets:ro
+    networks:
+      - backend
+
+  bot-api:
+    build: .
+    command: python -m app.main
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - signer
+    networks:
+      - backend
+
+  watcher-tron:
+    build: .
+    command: python -m services.watcher_tron.main
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - backend
+
+  watcher-bsc:
+    build: .
+    command: python -m services.watcher_bsc.main
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
